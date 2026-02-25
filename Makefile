@@ -1,4 +1,4 @@
-.PHONY: help clean format setup zip
+.PHONY: help clean format setup test zip
 
 PYTHON_VERSION ?= $(shell cat .python-version | cut -d '.' -f 1,2)
 PACKAGE_DIR ?= .venv/lib/python$(PYTHON_VERSION)/site-packages
@@ -18,6 +18,9 @@ $(DEPLOYMENT_ZIP): $(PACKAGE_DIR) lambda_function.py format
 	rm -f $(DEPLOYMENT_ZIP)
 	cd $(PACKAGE_DIR) && zip -r ../../../../$(DEPLOYMENT_ZIP) * -x "*/__pycache__/*" -x "./__pycache__/*"
 	zip $(DEPLOYMENT_ZIP) lambda_function.py
+
+test:
+	uv run pytest -v
 
 zip: deployment.zip	## Build deployment zip file
 
