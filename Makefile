@@ -8,7 +8,7 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 setup:	## Setup
-	uv sync
+	uv sync --extra test
 
 format:	## Format code
 	uv run ruff format --preview
@@ -19,8 +19,11 @@ $(DEPLOYMENT_ZIP): $(PACKAGE_DIR) lambda_function.py format
 	cd $(PACKAGE_DIR) && zip -r ../../../../$(DEPLOYMENT_ZIP) * -x "*/__pycache__/*" -x "./__pycache__/*"
 	zip $(DEPLOYMENT_ZIP) lambda_function.py
 
-test:
+test:	## Run tests
 	uv run pytest -v
+
+coverage:	## Run tests with coverage
+	uv run pytest --cov=lambda_function --cov-report=term-missing tests/
 
 zip: deployment.zip	## Build deployment zip file
 
