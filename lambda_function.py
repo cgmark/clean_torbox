@@ -6,16 +6,66 @@ import json
 import logging
 import os
 
-
 API_ROOT = "https://api.torbox.app/v1/api"
 API_KEY = os.getenv("API_KEY") or ""
-DOWNLOAD_EXPIRY = timedelta(days=14)
-DOWNLOAD_MAX_ETA = timedelta(hours=1)
-UPLOAD_EXPIRY = timedelta(hours=1)
-
 
 logger = logging.getLogger("clean_torbox")
 logger.setLevel(logging.DEBUG)
+
+
+def get_timedelta_from_env(
+    env_var_name: str, default_value: timedelta, unit: str
+) -> timedelta:
+    """
+    Reads a timedelta value from an environment variable, falling back to a default.
+
+    Args:
+        env_var_name: The name of the environment variable.
+        default_value: The default timedelta to use if the env var is not set or invalid.
+        unit: The unit of time for the environment variable ('days' or 'hours').
+
+    Returns:
+        The timedelta value.
+    """
+    env_value_str = os.getenv(env_var_name)
+    if env_value_str:
+        try:
+            if unit == "days":
+                value = int(env_value_str)
+                result = timedelta(days=value)
+                logger.info(f"Using {env_var_name} from environment: {result}")
+            elif unit == "hours":
+                value = float(env_value_str)  # Use float to allow for fractional hours
+                result = timedelta(hours=value)
+                logger.info(f"Using {env_var_name} from environment: {result}")
+            else:
+                logger.warning(
+                    f"Unsupported unit '{unit}' for environment variable {env_var_name}. Using default."
+                )
+                return default_value
+            return result
+        except ValueError:
+            logger.warning(
+                f"Invalid value for {env_var_name}: '{env_value_str}'. Expected a number. Using default: {default_value}"
+            )
+            return default_value
+    else:
+        logger.debug(f"{env_var_name} not set. Using default: {default_value}")
+        return default_value
+
+
+# Configure expiry and ETA times from environment variables with fallbacks
+DOWNLOAD_EXPIRY = get_timedelta_from_env(
+    env_var_name="DOWNLOAD_EXPIRY_DAYS", default_value=timedelta(days=14), unit="days"
+)
+UPLOAD_EXPIRY = get_timedelta_from_env(
+    env_var_name="UPLOAD_EXPIRY_HOURS", default_value=timedelta(hours=1), unit="hours"
+)
+DOWNLOAD_MAX_ETA = get_timedelta_from_env(
+    env_var_name="DOWNLOAD_MAX_ETA_HOURS",
+    default_value=timedelta(hours=1),
+    unit="hours",
+)
 
 client = httpx.AsyncClient(
     base_url=API_ROOT,
