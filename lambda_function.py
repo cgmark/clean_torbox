@@ -20,6 +20,7 @@ logger.setLevel(logging.DEBUG)
 client = httpx.AsyncClient(
     base_url=API_ROOT,
     headers={"Content-Type": "application/json", "Authorization": "bearer " + API_KEY},
+    timeout=30.0,
 )
 
 
