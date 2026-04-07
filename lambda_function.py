@@ -23,16 +23,19 @@ client = httpx.AsyncClient(
     timeout=30.0,
 )
 
+deletion_semaphore = asyncio.Semaphore(10)
+
 
 async def delete_res(res_attr, res_id, res_url):
-    logger.info(f"deleting {res_attr}={res_id}")
-    payload = {res_attr: str(res_id), "operation": "delete"}
-    logger.debug(f"request: {json.dumps(payload)}")
-    r = await client.post(
-        res_url,
-        json=payload,
-    )
-    logger.debug(f"response: {r.content}")
+    async with deletion_semaphore:
+        logger.info(f"deleting {res_attr}={res_id}")
+        payload = {res_attr: str(res_id), "operation": "delete"}
+        logger.debug(f"request: {json.dumps(payload)}")
+        r = await client.post(
+            res_url,
+            json=payload,
+        )
+        logger.debug(f"response: {r.content}")
 
 
 def should_delete_download(res):
@@ -108,10 +111,12 @@ async def async_lambda_handler():
         ),
     ]
 
-    results = await asyncio.gather(*[
-        client.get(res_url_path)
-        for res_type, res_url_path, res_should_del_fn, res_del_attr, res_del_url_path in resources
-    ])
+    results = await asyncio.gather(
+        *[
+            client.get(res_url_path)
+            for res_type, res_url_path, res_should_del_fn, res_del_attr, res_del_url_path in resources
+        ]
+    )
 
     deletions = []
     for r, (
@@ -121,7 +126,7 @@ async def async_lambda_handler():
         res_del_attr,
         res_del_url_path,
     ) in zip(results, resources):
-        if 200 < r.status_code > 299:
+        if r.status_code < 200 or r.status_code > 299:
             logger.error(
                 f"Error retrieving {res_type} from {res_url_path}: {r.content}"
             )
