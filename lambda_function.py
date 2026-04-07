@@ -10,8 +10,8 @@ import os
 API_ROOT = "https://api.torbox.app/v1/api"
 API_KEY = os.getenv("API_KEY") or ""
 DOWNLOAD_EXPIRY = timedelta(days=14)
-DOWNLOAD_MAX_ETA = 3600  # 1 hour in seconds
-UPLOAD_EXPIRY = timedelta(seconds=3600)
+DOWNLOAD_MAX_ETA = timedelta(hours=1)
+UPLOAD_EXPIRY = timedelta(hours=1)
 
 
 logger = logging.getLogger("clean_torbox")
@@ -57,7 +57,7 @@ def should_delete_download(res):
         if res.get("download_speed") == 0:
             logger.info(f"{res['id']} [STALLED] {res.get('name')}")
             return True
-        elif res.get("eta") > DOWNLOAD_MAX_ETA:
+        elif timedelta(seconds=res.get("eta", 0)) > DOWNLOAD_MAX_ETA:
             logger.info(f"{res['id']} [SLOW] {res.get('name')}")
             return True
         else:
@@ -111,12 +111,10 @@ async def async_lambda_handler():
         ),
     ]
 
-    results = await asyncio.gather(
-        *[
-            client.get(res_url_path)
-            for res_type, res_url_path, res_should_del_fn, res_del_attr, res_del_url_path in resources
-        ]
-    )
+    results = await asyncio.gather(*[
+        client.get(res_url_path)
+        for res_type, res_url_path, res_should_del_fn, res_del_attr, res_del_url_path in resources
+    ])
 
     deletions = []
     for r, (
