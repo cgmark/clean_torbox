@@ -161,10 +161,13 @@ async def async_lambda_handler():
         ),
     ]
 
-    results = await asyncio.gather(*[
-        client.get(res_url_path)
-        for res_type, res_url_path, res_should_del_fn, res_del_attr, res_del_url_path in resources
-    ])
+    results = await asyncio.gather(
+        *[
+            client.get(res_url_path)
+            for res_type, res_url_path, res_should_del_fn, res_del_attr, res_del_url_path in resources
+        ],
+        return_exceptions=True,
+    )
 
     deletions = []
     for r, (
@@ -174,6 +177,9 @@ async def async_lambda_handler():
         res_del_attr,
         res_del_url_path,
     ) in zip(results, resources):
+        if isinstance(r, Exception):
+            logger.error(f"Error retrieving {res_type} from {res_url_path}: {r}")
+            continue
         if r.status_code < 200 or r.status_code > 299:
             logger.error(
                 f"Error retrieving {res_type} from {res_url_path}: {r.content}"
@@ -185,7 +191,10 @@ async def async_lambda_handler():
             if res_should_del_fn(res):
                 deletions.append(delete_res(res_del_attr, res["id"], res_del_url_path))
 
-    await asyncio.gather(*deletions)
+    results = await asyncio.gather(*deletions, return_exceptions=True)
+    for result in results:
+        if isinstance(result, Exception):
+            logger.error(f"Deletion task failed: {result}")
 
     await client.aclose()
 
